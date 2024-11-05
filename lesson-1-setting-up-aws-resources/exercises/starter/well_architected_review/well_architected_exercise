@@ -1,0 +1,38 @@
+# Exercise: Evaluating On-Premises Kubernetes Cluster for AWS Migration
+
+## Scenario
+
+Your company has decided to migrate its on-premises Kubernetes cluster to AWS. As a cloud architect, you've been tasked with evaluating the current infrastructure and recommending an appropriate migration strategy and target reference architecture.
+
+## Current On-Premises Infrastructure
+
+### Networking:
+- Bare Metal Load balancer for incoming traffic
+- Cisco VPN for secure remote access
+
+### Compute:
+- 20 physical servers running as Kubernetes nodes
+- Auto-scaling managed through Kubernetes
+
+### Storage:
+- Network-attached storage (NAS) for persistent volumes
+
+### Database:
+- PostgreSQL cluster for application data
+
+## Task
+
+1. Evaluate the current infrastructure using the six pillars of the AWS Well-Architected Framework:
+   - Operational Excellence
+   - Security
+   - Reliability
+   - Performance Efficiency
+   - Cost Optimization
+   - Sustainability
+
+2. Based on your evaluation, determine the most appropriate migration strategy.
+
+## Deliverables
+
+1. A brief analysis of the current infrastructure based on the Well-Architected Framework.
+2. Recommended migration strategy with justification.
