@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for Athena exercise setup'
+
+Parameters:
+  KaggleUsername:
+    Type: String
+    Description: Your Kaggle username
+
+  KaggleKey:
+    Type: String
+    Description: Your Kaggle API key
+    NoEcho: true
+
+Resources:
+  AthenaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 
+        - 'athena-exercise-bucket-${Date}-${RandomString}'
+        - Date: !Select [0, !Split ["T", !Ref "AWS::Timestamp"]]
+          RandomString: !Select [2, !Split ["-", !Select [2, !Split ["/", !Ref "AWS::StackId"]]]]
+
+  InputPrefix:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AthenaBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: InputPrefixPolicy
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub '${AthenaBucket.Arn}/input/*'
+
+  OutputPrefix:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AthenaBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: OutputPrefixPolicy
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub '${AthenaBucket.Arn}/output/*'
+
+  DownloadFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import os
+          import subprocess
+          import zipfile
+
+          def handler(event, context):
+              if event['RequestType'] == 'Create':
+                  s3 = boto3.client('s3')
+                  bucket = event['ResourceProperties']['BucketName']
+                  kaggle_username = event['ResourceProperties']['KaggleUsername']
+                  kaggle_key = event['ResourceProperties']['KaggleKey']
+
+                  # Set Kaggle credentials
+                  os.environ['KAGGLE_USERNAME'] = kaggle_username
+                  os.environ['KAGGLE_KEY'] = kaggle_key
+
+                  # Download dataset
+                  subprocess.check_call(['pip', 'install', 'kaggle', '--target', '/tmp'])
+                  subprocess.check_call(['python', '-m', 'kaggle.cli', 'datasets', 'download', 'shivamb/netflix-shows', '-p', '/tmp'])
+
+                  # Unzip dataset
+                  with zipfile.ZipFile('/tmp/netflix-shows.zip', 'r') as zip_ref:
+                      zip_ref.extractall('/tmp')
+
+                  # Upload to S3
+                  s3.upload_file('/tmp/netflix_titles.csv', bucket, 'input/netflix_titles.csv')
+
+                  file_location = f's3://{bucket}/input/netflix_titles.csv'
+                  print(f"File location: {file_location}")
+
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {'FileLocation': file_location})
+              else:
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+
+      Runtime: python3.8
+      Timeout: 300
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub '${AthenaBucket.Arn}/*'
+
+  DownloadDataset:
+    Type: Custom::DownloadDataset
+    Properties:
+      ServiceToken: !GetAtt DownloadFunction.Arn
+      BucketName: !Ref AthenaBucket
+      KaggleUsername: !Ref KaggleUsername
+      KaggleKey: !Ref KaggleKey
+
+Outputs:
+  BucketName:
+    Description: Name of the created S3 bucket
+    Value: !Ref AthenaBucket
+
+  FileLocation:
+    Description: Location of the Netflix dataset file
+    Value: !GetAtt DownloadDataset.FileLocation

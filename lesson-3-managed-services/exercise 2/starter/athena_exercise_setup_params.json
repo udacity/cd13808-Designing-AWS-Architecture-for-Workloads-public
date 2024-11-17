@@ -1,0 +1,14 @@
+[
+    {
+      "ParameterKey": "KaggleUsername",
+      "ParameterValue": "<INSERT YOUR KAGGLE USERNAME>"
+    },
+    {
+      "ParameterKey": "KaggleKey",
+      "ParameterValue": "<INSERT YOUR KAGGLE API KEY HERE>"
+    },
+    {
+      "ParameterKey": "TimeStamp",
+      "ParameterValue": "$(date +%Y%m%d%H%M%S)"
+    }
+  ]
